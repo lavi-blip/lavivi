@@ -68,7 +68,10 @@ def analyze_rfp(content: str, *, client: Anthropic | None = None) -> RfpAnalysis
     if not content.strip():
         raise ValueError("Cannot analyze empty content")
 
-    client = client or Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key and client is None:
+        raise ValueError("ANTHROPIC_API_KEY is not set. Add it to .env or export it.")
+    client = client or Anthropic(api_key=api_key)
 
     message = client.messages.create(
         model=CLAUDE_MODEL,
