@@ -230,6 +230,55 @@ def _create_simple_in_monday(analysis, executor: str) -> None:
             st.error(f"שגיאה ביצירה ב-Monday: {e}")
 
 
+def _add_to_history(entry: dict) -> None:
+    if "rfp_history" not in st.session_state:
+        st.session_state["rfp_history"] = []
+    existing_titles = {e["title"] for e in st.session_state["rfp_history"]}
+    if entry["title"] not in existing_titles:
+        st.session_state["rfp_history"].append(entry)
+
+
+def _build_chat_context() -> str:
+    from src import profile as org_profile_mod
+    profile_text = org_profile_mod.load()
+    parts = [f"## פרופיל הארגון\n{profile_text}"]
+
+    history = st.session_state.get("rfp_history", [])
+    if history:
+        parts.append("## קולות קוראים שנותחו בסשן זה")
+        for i, item in enumerate(history, 1):
+            parts.append(
+                f"### {i}. {item['title']}\n"
+                f"- גוף מפרסם: {item.get('funder', '—')}\n"
+                f"- מועד הגשה: {item.get('deadline', '—')}\n"
+                f"- ציון התאמה: {item.get('fit_score', '—')}\n"
+                f"- המלצה: {item.get('recommendation', '—')}\n"
+                f"- פסילות: {', '.join(item.get('disqualifiers', [])) or 'אין'}\n"
+                f"- משימות: {item.get('tasks_summary', '—')}"
+            )
+    return "\n\n".join(parts)
+
+
+def _chat_respond(messages: list[dict]) -> str:
+    if not _check_keys():
+        return "חסר מפתח API."
+    llm = _get_llm()
+    context = _build_chat_context()
+    system = f"""אתה עוזר אישי חכם לצוות גיוס משאבים בעמותה "צומחים מחדש".
+יש לך גישה לפרופיל הארגון ולכל קולות הקוראים שנותחו.
+תפקידך לענות על שאלות, לסייע בתעדוף, לנסח מסמכים, ולסייע בכל שאלה הקשורה לגיוס משאבים.
+ענה תמיד בעברית, בצורה ממוקדת ומקצועית.
+
+{context}"""
+    history_text = "\n".join(
+        f"{'משתמש' if m['role'] == 'user' else 'עוזר'}: {m['content']}"
+        for m in messages[:-1]
+    )
+    user_msg = messages[-1]["content"]
+    prompt = f"{history_text}\n\nמשתמש: {user_msg}" if history_text else user_msg
+    return llm.complete(system=system, user=prompt, max_tokens=4096)
+
+
 def _create_scan_items(items) -> None:
     from src import config
     from src.monday import MondayClient
@@ -265,10 +314,11 @@ def _create_scan_items(items) -> None:
 
 
 # ── tabs ──────────────────────────────────────────────────────────────────────
-tab_specific, tab_scan, tab_profile = st.tabs([
+tab_specific, tab_scan, tab_profile, tab_chat = st.tabs([
     "🎯 קול קורא ספציפי",
     "🔍 סריקה שיגרתית",
     "🏢 פרופיל ארגון",
+    "💬 צ'אט",
 ])
 
 
@@ -324,11 +374,29 @@ with tab_specific:
                     report = check_fit(content, org_profile, llm=llm)
                     st.session_state["last_report"] = report
                     st.session_state["last_mode"] = "deep"
+                    _add_to_history({
+                        "title": report.title_he,
+                        "funder": report.funder,
+                        "deadline": report.deadline.isoformat() if report.deadline else None,
+                        "fit_score": report.fit_score,
+                        "recommendation": report.recommendation_he,
+                        "disqualifiers": report.disqualifiers,
+                        "tasks_summary": ", ".join(r.name_he for r in report.requirements[:4]),
+                    })
                 else:
                     from src.analyzer import analyze_rfp
                     analysis = analyze_rfp(content, llm=llm)
                     st.session_state["last_analysis"] = analysis
                     st.session_state["last_mode"] = "simple"
+                    _add_to_history({
+                        "title": analysis.title_he,
+                        "funder": analysis.funder,
+                        "deadline": analysis.deadline.isoformat() if analysis.deadline else None,
+                        "fit_score": None,
+                        "recommendation": analysis.submission_analysis_he,
+                        "disqualifiers": [],
+                        "tasks_summary": ", ".join(t.name_he for t in analysis.tasks[:4]),
+                    })
             except Exception as e:
                 st.error(f"שגיאה: {e}")
                 st.stop()
@@ -401,3 +469,45 @@ with tab_profile:
                 org_profile_mod.build_and_save(MondayClient())
                 st.success("הפרופיל עודכן מהגשות קודמות ✓")
                 st.rerun()
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 4 — chat
+# ════════════════════════════════════════════════════════════════════════════
+with tab_chat:
+    st.header("💬 צ'אט עם הכלי")
+
+    rfp_count = len(st.session_state.get("rfp_history", []))
+    if rfp_count:
+        st.caption(f"הכלי מכיר {rfp_count} קולות קוראים שנותחו בסשן זה.")
+    else:
+        st.caption("נתח קול קורא בטאב הראשון — ואז תוכל לשאול כאן שאלות עליו.")
+
+    if "chat_messages" not in st.session_state:
+        st.session_state["chat_messages"] = []
+
+    # display history
+    for msg in st.session_state["chat_messages"]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # input
+    if prompt := st.chat_input("שאל שאלה או בקש פעולה..."):
+        if not _check_keys():
+            st.stop()
+
+        st.session_state["chat_messages"].append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            with st.spinner("חושב..."):
+                reply = _chat_respond(st.session_state["chat_messages"])
+            st.markdown(reply)
+
+        st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
+
+    if st.session_state.get("chat_messages"):
+        if st.button("🗑️ נקה שיחה"):
+            st.session_state["chat_messages"] = []
+            st.rerun()
