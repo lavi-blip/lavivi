@@ -10,17 +10,35 @@ from bs4 import BeautifulSoup
 
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (compatible; LaviviRfpIntake/1.0; "
-        "+https://github.com/lavi-blip/lavivi)"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "he,en;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
 }
 
 MAX_CHARS = 60_000
 
 
 def fetch_url(url: str, timeout: int = 30) -> str:
-    response = requests.get(url, headers=HEADERS, timeout=timeout)
+    session = requests.Session()
+    session.headers.update(HEADERS)
+    response = session.get(url, timeout=timeout, allow_redirects=True)
+
+    if response.status_code == 403:
+        raise ValueError(
+            f"האתר חסם את הגישה האוטומטית (403).\n"
+            f"פתרון: פתח את הדף בדפדפן, שמור אותו כ-PDF (Ctrl+P → שמור כ-PDF), "
+            f"והעלה אותו דרך 'העלה קובץ PDF' באפליקציה."
+        )
+
     response.raise_for_status()
 
     content_type = response.headers.get("Content-Type", "").lower()
