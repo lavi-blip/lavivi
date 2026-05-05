@@ -1,14 +1,12 @@
-"""Deep fit analysis: multi-page RFP content × org profile → FitReport."""
+"""Deep fit analysis using any supported LLM provider (Claude or Gemini)."""
 
 from __future__ import annotations
 
 import json
-import os
 from datetime import date
 
-from anthropic import Anthropic
-
-from .config import CLAUDE_MODEL, SOURCE_CATEGORIES, TASK_TYPES
+from .config import SOURCE_CATEGORIES, TASK_TYPES
+from .llm import LLMClient, Provider, from_env
 from .models import ApplicationQuestion, FitReport, FitScore, Requirement
 
 
@@ -80,26 +78,15 @@ def check_fit(
     content: str,
     org_profile: str,
     *,
-    client: Anthropic | None = None,
+    llm: LLMClient | None = None,
+    provider: Provider = "claude",
 ) -> FitReport:
     if not content.strip():
         raise ValueError("Cannot analyze empty content")
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key and client is None:
-        raise ValueError("ANTHROPIC_API_KEY is not set. Add it to .env or export it.")
-    client = client or Anthropic(api_key=api_key)
-
+    llm = llm or from_env()
     system = SYSTEM_PROMPT.format(profile=org_profile)
-
-    message = client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=8192,
-        system=system,
-        messages=[{"role": "user", "content": _user_prompt(content)}],
-    )
-
-    raw = "".join(block.text for block in message.content if block.type == "text")
+    raw = llm.complete(system=system, user=_user_prompt(content), max_tokens=8192)
     payload = _extract_json(raw)
     return _to_report(payload)
 

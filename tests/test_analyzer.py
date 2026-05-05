@@ -66,7 +66,7 @@ def test_analyze_rfp_happy_path():
 
 def test_analyze_rfp_blocks_when_deadline_missing():
     client = FakeAnthropic(_payload(deadline=None))
-    with pytest.raises(ValueError, match="deadline"):
+    with pytest.raises(ValueError, match="מועד הגשה"):
         analyze_rfp("some content", client=client)
 
 
