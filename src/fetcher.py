@@ -32,12 +32,8 @@ def fetch_url(url: str, timeout: int = 30) -> str:
     session.headers.update(HEADERS)
     response = session.get(url, timeout=timeout, allow_redirects=True)
 
-    if response.status_code == 403:
-        raise ValueError(
-            f"האתר חסם את הגישה האוטומטית (403).\n"
-            f"פתרון: פתח את הדף בדפדפן, שמור אותו כ-PDF (Ctrl+P → שמור כ-PDF), "
-            f"והעלה אותו דרך 'העלה קובץ PDF' באפליקציה."
-        )
+    if response.status_code in (403, 401, 429):
+        return _fetch_with_browser(url, timeout=timeout)
 
     response.raise_for_status()
 
@@ -46,6 +42,30 @@ def fetch_url(url: str, timeout: int = 30) -> str:
         return _extract_pdf_bytes(response.content)
 
     return _extract_html(response.text)
+
+
+def _fetch_with_browser(url: str, timeout: int = 30) -> str:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        raise ValueError(
+            "נדרשת התקנה חד-פעמית: הרץ בPowerShell:\n"
+            "python -m playwright install chromium"
+        )
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent=HEADERS["User-Agent"],
+            locale="he-IL",
+            viewport={"width": 1280, "height": 800},
+        )
+        page = context.new_page()
+        page.goto(url, wait_until="networkidle", timeout=timeout * 1000)
+        html = page.content()
+        browser.close()
+
+    return _extract_html(html)
 
 
 def read_file(path: str | Path) -> str:
