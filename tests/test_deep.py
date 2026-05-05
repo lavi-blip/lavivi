@@ -71,9 +71,9 @@ def test_to_report_happy_path():
     assert report.is_worth_submitting
 
 
-def test_to_report_blocks_missing_deadline():
-    with pytest.raises(ValueError, match="מועד הגשה"):
-        _to_report(_fit_payload(deadline=None))
+def test_to_report_returns_none_deadline_when_missing():
+    report = _to_report(_fit_payload(deadline=None))
+    assert report.deadline is None
 
 
 def test_to_report_disqualifiers_block_submission():

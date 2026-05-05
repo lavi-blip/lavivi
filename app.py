@@ -84,14 +84,26 @@ def _check_keys() -> bool:
     return True
 
 
+def _deadline_picker(key: str, existing: "date | None") -> "date | None":
+    from datetime import date as _date
+    if existing:
+        return existing
+    st.warning("⚠️ לא נמצא מועד הגשה אוטומטית — הכנס ידנית:")
+    chosen = st.date_input("מועד הגשה", key=key)
+    return chosen if chosen else None
+
+
 def _show_fit_report(report, create_in_monday: bool, executor: str) -> None:
     score_emoji = {"גבוה": "🟢", "בינוני": "🟡", "נמוך": "🔴", "לא מתאים": "⛔"}
     emoji = score_emoji.get(report.fit_score, "⚪")
 
+    deadline = _deadline_picker("fit_deadline", report.deadline)
+    report.deadline = deadline
+
     st.subheader(report.title_he)
     cols = st.columns(4)
     cols[0].metric("גוף מפרסם", report.funder or "—")
-    cols[1].metric("מועד הגשה", report.deadline.isoformat())
+    cols[1].metric("מועד הגשה", deadline.isoformat() if deadline else "—")
     cols[2].metric("התאמה", f"{emoji} {report.fit_score}")
     cols[3].metric("סכום", f"${report.requested_amount_usd:,.0f}" if report.requested_amount_usd else "—")
 
@@ -128,15 +140,20 @@ def _show_fit_report(report, create_in_monday: bool, executor: str) -> None:
                 st.text_area("טיוטת תשובה", q.draft_answer_he, height=120, key=f"q_{q.question_he[:30]}")
 
     if create_in_monday and os.environ.get("MONDAY_API_KEY"):
-        if st.button("✅ צור ב-Monday", type="primary"):
+        if not deadline:
+            st.error("יש להכניס מועד הגשה לפני יצירה ב-Monday.")
+        elif st.button("✅ צור ב-Monday", type="primary"):
             _create_deep_in_monday(report, executor)
 
 
 def _show_simple_analysis(analysis, create_in_monday: bool, executor: str) -> None:
+    deadline = _deadline_picker("simple_deadline", analysis.deadline)
+    analysis.deadline = deadline
+
     st.subheader(analysis.title_he)
     cols = st.columns(4)
     cols[0].metric("גוף מפרסם", analysis.funder or "—")
-    cols[1].metric("מועד הגשה", analysis.deadline.isoformat())
+    cols[1].metric("מועד הגשה", deadline.isoformat() if deadline else "—")
     cols[2].metric("קבוצה", "ישראל" if analysis.origin == "israel" else "חו\"ל")
     cols[3].metric("סכום", f"${analysis.requested_amount_usd:,.0f}" if analysis.requested_amount_usd else "—")
 
@@ -147,7 +164,9 @@ def _show_simple_analysis(analysis, create_in_monday: bool, executor: str) -> No
         st.markdown(f"- {t.name_he} — {t.estimated_hours:g}ש׳ | {t.days_before_deadline} ימים לפני")
 
     if create_in_monday and os.environ.get("MONDAY_API_KEY"):
-        if st.button("✅ צור ב-Monday", type="primary"):
+        if not deadline:
+            st.error("יש להכניס מועד הגשה לפני יצירה ב-Monday.")
+        elif st.button("✅ צור ב-Monday", type="primary"):
             _create_simple_in_monday(analysis, executor)
 
 

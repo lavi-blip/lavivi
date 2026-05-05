@@ -38,7 +38,7 @@ class Task:
 class RfpAnalysis:
     title_he: str
     funder: str
-    deadline: date
+    deadline: date | None
     origin: Origin
     source_category: str
     submission_analysis_he: str
@@ -87,7 +87,7 @@ class ApplicationQuestion:
 class FitReport:
     title_he: str
     funder: str
-    deadline: date
+    deadline: date | None
     origin: Origin
     source_category: str
     fit_score: FitScore

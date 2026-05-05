@@ -107,11 +107,7 @@ def _extract_json(text: str) -> dict:
 
 def _to_analysis(payload: dict) -> RfpAnalysis:
     deadline_raw = payload.get("deadline")
-    if not deadline_raw:
-        raise ValueError(
-            "לא נמצא מועד הגשה בקול הקורא. "
-            "אי אפשר ליצור פריט ב-Monday ללא תאריך יעד."
-        )
+    deadline = date.fromisoformat(deadline_raw) if deadline_raw else None
 
     source_category = payload.get("source_category", "")
     if source_category not in SOURCE_CATEGORIES:
@@ -131,7 +127,7 @@ def _to_analysis(payload: dict) -> RfpAnalysis:
     return RfpAnalysis(
         title_he=payload["title_he"].strip(),
         funder=payload.get("funder", "").strip(),
-        deadline=date.fromisoformat(deadline_raw),
+        deadline=deadline,
         origin=payload["origin"],
         source_category=source_category,
         submission_analysis_he=payload["submission_analysis_he"].strip(),

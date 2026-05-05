@@ -103,10 +103,7 @@ def _extract_json(text: str) -> dict:
 
 def _to_report(p: dict) -> FitReport:
     deadline_raw = p.get("deadline")
-    if not deadline_raw:
-        raise ValueError(
-            "לא נמצא מועד הגשה בקול הקורא. אי אפשר ליצור פריט ב-Monday ללא תאריך יעד."
-        )
+    deadline = date.fromisoformat(deadline_raw) if deadline_raw else None
 
     source_category = p.get("source_category", "")
     if source_category not in SOURCE_CATEGORIES:
@@ -137,7 +134,7 @@ def _to_report(p: dict) -> FitReport:
     return FitReport(
         title_he=p["title_he"].strip(),
         funder=p.get("funder", "").strip(),
-        deadline=date.fromisoformat(deadline_raw),
+        deadline=deadline,
         origin=p.get("origin", "israel"),
         source_category=source_category,
         fit_score=_normalize_score(p.get("fit_score", "נמוך")),
