@@ -24,9 +24,9 @@ class Task:
                 f"Task {self.name_he!r} must have estimated_hours > 0 "
                 "(otherwise the DONE*כמות שעות formula in Monday will error)."
             )
-        if self.days_before_deadline < 0:
+        if self.days_before_deadline < -30:
             raise ValueError(
-                f"Task {self.name_he!r} cannot be scheduled after the deadline."
+                f"Task {self.name_he!r} is scheduled more than 30 days after the deadline."
             )
 
     def due_date(self, deadline: date) -> date:
