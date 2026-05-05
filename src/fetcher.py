@@ -62,11 +62,18 @@ def _fetch_with_browser(url: str, timeout: int = 30) -> str:
         )
         page = context.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-        page.wait_for_timeout(2000)  # let JS render initial content
-        html = page.content()
+        page.wait_for_timeout(4000)
+        # try to wait for meaningful content
+        try:
+            page.wait_for_selector("main, article, .content, #content, [role='main']",
+                                   timeout=10_000)
+        except Exception:
+            pass
+        text = page.inner_text("body")
         browser.close()
 
-    return _extract_html(html)
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    return "\n".join(lines)[:MAX_CHARS]
 
 
 def read_file(path: str | Path) -> str:
