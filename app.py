@@ -70,6 +70,8 @@ with st.sidebar:
         """)
 
 
+# ── helper functions (must be defined before tab content) ─────────────────────
+
 def _get_llm():
     from src.llm import LLMClient
     return LLMClient(provider=provider)
@@ -78,92 +80,13 @@ def _get_llm():
 def _check_keys() -> bool:
     if not os.environ.get("GEMINI_API_KEY"):
         st.error("הכנס Gemini API Key בסרגל הצד.")
-        st.error("הכנס Gemini API Key בסרגל הצד.")
         return False
     return True
 
 
-# ── tabs ──────────────────────────────────────────────────────────────────────
-tab_specific, tab_scan, tab_profile = st.tabs([
-    "🎯 קול קורא ספציפי",
-    "🔍 סריקה שיגרתית",
-    "🏢 פרופיל ארגון",
-])
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 1 — specific RFP
-# ════════════════════════════════════════════════════════════════════════════
-with tab_specific:
-    st.header("ניתוח קול קורא ספציפי")
-
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        url = st.text_input("קישור לקול הקורא", placeholder="https://...")
-    with col2:
-        deep_mode = st.checkbox("ניתוח עמוק", value=True,
-                                help="זוחל דפים נוספים + בודק התאמה מול פרופיל הארגון")
-
-    uploaded = st.file_uploader("או העלה קובץ PDF", type=["pdf", "txt", "html"])
-    create_in_monday = st.checkbox("צור ב-Monday לאחר הניתוח", value=False)
-
-    analyze_btn = st.button("🔍 נתח", type="primary", use_container_width=True)
-
-    if analyze_btn:
-        if not _check_keys():
-            st.stop()
-        if not url and not uploaded:
-            st.warning("הכנס קישור או העלה קובץ.")
-            st.stop()
-
-        with st.spinner("מוריד ומנתח..."):
-            try:
-                if uploaded:
-                    import tempfile, os as _os
-                    suffix = Path(uploaded.name).suffix
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
-                        f.write(uploaded.read())
-                        tmp_path = f.name
-                    from src.fetcher import read_file
-                    content = read_file(tmp_path)
-                    _os.unlink(tmp_path)
-                elif deep_mode:
-                    from src.crawler import crawl
-                    content = crawl(url)
-                else:
-                    from src.fetcher import fetch_url
-                    content = fetch_url(url)
-
-                llm = _get_llm()
-
-                if deep_mode:
-                    from src import profile as org_profile_mod
-                    from src.fit_checker import check_fit
-                    org_profile = org_profile_mod.load()
-                    report = check_fit(content, org_profile, llm=llm)
-                    st.session_state["last_report"] = report
-                    st.session_state["last_mode"] = "deep"
-                else:
-                    from src.analyzer import analyze_rfp
-                    analysis = analyze_rfp(content, llm=llm)
-                    st.session_state["last_analysis"] = analysis
-                    st.session_state["last_mode"] = "simple"
-            except Exception as e:
-                st.error(f"שגיאה: {e}")
-                st.stop()
-
-    # ── display results ───────────────────────────────────────────────────
-    if st.session_state.get("last_mode") == "deep" and "last_report" in st.session_state:
-        _show_fit_report(st.session_state["last_report"], create_in_monday, executor)
-    elif st.session_state.get("last_mode") == "simple" and "last_analysis" in st.session_state:
-        _show_simple_analysis(st.session_state["last_analysis"], create_in_monday, executor)
-
-
 def _show_fit_report(report, create_in_monday: bool, executor: str) -> None:
     score_emoji = {"גבוה": "🟢", "בינוני": "🟡", "נמוך": "🔴", "לא מתאים": "⛔"}
-    score_color = {"גבוה": "green", "בינוני": "orange", "נמוך": "red", "לא מתאים": "red"}
     emoji = score_emoji.get(report.fit_score, "⚪")
-    color = score_color.get(report.fit_score, "gray")
 
     st.subheader(report.title_he)
     cols = st.columns(4)
@@ -210,7 +133,6 @@ def _show_fit_report(report, create_in_monday: bool, executor: str) -> None:
 
 
 def _show_simple_analysis(analysis, create_in_monday: bool, executor: str) -> None:
-    from src.preview import render_preview
     st.subheader(analysis.title_he)
     cols = st.columns(4)
     cols[0].metric("גוף מפרסם", analysis.funder or "—")
@@ -289,40 +211,6 @@ def _create_simple_in_monday(analysis, executor: str) -> None:
             st.error(f"שגיאה ביצירה ב-Monday: {e}")
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 2 — routine scan
-# ════════════════════════════════════════════════════════════════════════════
-with tab_scan:
-    st.header("סריקה שיגרתית — פלטפורמות")
-    st.caption("הכלי סורק את כל הפלטפורמות ב-sources.yaml ומציג קולות קוראים חדשים.")
-
-    if st.button("🔍 סרוק עכשיו", type="primary", use_container_width=True):
-        with st.spinner("סורק פלטפורמות..."):
-            from src.scanner import scan_all
-            found = scan_all()
-            st.session_state["scan_results"] = found
-
-    if "scan_results" in st.session_state:
-        found = st.session_state["scan_results"]
-        if not found:
-            st.success("אין קולות קוראים חדשים.")
-        else:
-            st.info(f"נמצאו **{len(found)}** קולות קוראים חדשים.")
-            selected = {}
-            for i, rfp in enumerate(found):
-                col1, col2, col3 = st.columns([0.5, 5, 2])
-                selected[i] = col1.checkbox("", value=True, key=f"sel_{i}")
-                col2.markdown(f"**{rfp.title[:70]}**")
-                col3.caption(rfp.platform)
-
-            if st.button("✅ צור ב-Monday את הסומנים", type="primary"):
-                if not os.environ.get("MONDAY_API_KEY"):
-                    st.error("חסר Monday API Key בסרגל הצד.")
-                else:
-                    chosen = [found[i] for i, v in selected.items() if v]
-                    _create_scan_items(chosen)
-
-
 def _create_scan_items(items) -> None:
     from src import config
     from src.monday import MondayClient
@@ -357,6 +245,116 @@ def _create_scan_items(items) -> None:
             st.error(f"שגיאה: {e}")
 
 
+# ── tabs ──────────────────────────────────────────────────────────────────────
+tab_specific, tab_scan, tab_profile = st.tabs([
+    "🎯 קול קורא ספציפי",
+    "🔍 סריקה שיגרתית",
+    "🏢 פרופיל ארגון",
+])
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 1 — specific RFP
+# ════════════════════════════════════════════════════════════════════════════
+with tab_specific:
+    st.header("ניתוח קול קורא ספציפי")
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        url = st.text_input("קישור לקול הקורא", placeholder="https://...")
+    with col2:
+        deep_mode = st.checkbox("ניתוח עמוק", value=True,
+                                help="זוחל דפים נוספים + בודק התאמה מול פרופיל הארגון")
+
+    uploaded = st.file_uploader("או העלה קובץ PDF", type=["pdf", "txt", "html"])
+    create_in_monday = st.checkbox("צור ב-Monday לאחר הניתוח", value=False)
+
+    analyze_btn = st.button("🔍 נתח", type="primary", use_container_width=True)
+
+    if analyze_btn:
+        if not _check_keys():
+            st.stop()
+        if not url and not uploaded:
+            st.warning("הכנס קישור או העלה קובץ.")
+            st.stop()
+
+        with st.spinner("מוריד ומנתח..."):
+            try:
+                if uploaded:
+                    import tempfile, os as _os
+                    suffix = Path(uploaded.name).suffix
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+                        f.write(uploaded.read())
+                        tmp_path = f.name
+                    from src.fetcher import read_file
+                    content = read_file(tmp_path)
+                    _os.unlink(tmp_path)
+                elif deep_mode:
+                    from src.crawler import crawl
+                    content = crawl(url)
+                else:
+                    from src.fetcher import fetch_url
+                    content = fetch_url(url)
+
+                llm = _get_llm()
+
+                if deep_mode:
+                    from src import profile as org_profile_mod
+                    from src.fit_checker import check_fit
+                    org_profile = org_profile_mod.load()
+                    report = check_fit(content, org_profile, llm=llm)
+                    st.session_state["last_report"] = report
+                    st.session_state["last_mode"] = "deep"
+                else:
+                    from src.analyzer import analyze_rfp
+                    analysis = analyze_rfp(content, llm=llm)
+                    st.session_state["last_analysis"] = analysis
+                    st.session_state["last_mode"] = "simple"
+            except Exception as e:
+                st.error(f"שגיאה: {e}")
+                st.stop()
+
+    # ── display results ───────────────────────────────────────────────────
+    if st.session_state.get("last_mode") == "deep" and "last_report" in st.session_state:
+        _show_fit_report(st.session_state["last_report"], create_in_monday, executor)
+    elif st.session_state.get("last_mode") == "simple" and "last_analysis" in st.session_state:
+        _show_simple_analysis(st.session_state["last_analysis"], create_in_monday, executor)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 2 — routine scan
+# ════════════════════════════════════════════════════════════════════════════
+with tab_scan:
+    st.header("סריקה שיגרתית — פלטפורמות")
+    st.caption("הכלי סורק את כל הפלטפורמות ב-sources.yaml ומציג קולות קוראים חדשים.")
+
+    if st.button("🔍 סרוק עכשיו", type="primary", use_container_width=True):
+        with st.spinner("סורק פלטפורמות..."):
+            from src.scanner import scan_all
+            found = scan_all()
+            st.session_state["scan_results"] = found
+
+    if "scan_results" in st.session_state:
+        found = st.session_state["scan_results"]
+        if not found:
+            st.success("אין קולות קוראים חדשים.")
+        else:
+            st.info(f"נמצאו **{len(found)}** קולות קוראים חדשים.")
+            selected = {}
+            for i, rfp in enumerate(found):
+                col1, col2, col3 = st.columns([0.5, 5, 2])
+                selected[i] = col1.checkbox("", value=True, key=f"sel_{i}")
+                col2.markdown(f"**{rfp.title[:70]}**")
+                col3.caption(rfp.platform)
+
+            if st.button("✅ צור ב-Monday את הסומנים", type="primary"):
+                if not os.environ.get("MONDAY_API_KEY"):
+                    st.error("חסר Monday API Key בסרגל הצד.")
+                else:
+                    chosen = [found[i] for i, v in selected.items() if v]
+                    _create_scan_items(chosen)
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 3 — org profile
 # ════════════════════════════════════════════════════════════════════════════
@@ -381,6 +379,6 @@ with tab_profile:
             with st.spinner("שולף נתונים מ-Monday..."):
                 from src.monday import MondayClient
                 from src import profile as org_profile_mod
-                history = org_profile_mod.build_and_save(MondayClient())
+                org_profile_mod.build_and_save(MondayClient())
                 st.success("הפרופיל עודכן מהגשות קודמות ✓")
                 st.rerun()
