@@ -9,7 +9,7 @@ from typing import Any
 import requests
 
 from . import config
-from .models import RfpAnalysis, Task
+from .models import FitReport, Requirement, RfpAnalysis, Task
 
 
 class MondayError(RuntimeError):
@@ -108,6 +108,17 @@ class MondayClient:
         )
         return data["create_subitem"]["id"]
 
+    def create_update(self, *, item_id: str, body: str) -> str:
+        data = self._request(
+            """
+            mutation ($item: ID!, $body: String!) {
+              create_update(item_id: $item, body: $body) { id }
+            }
+            """,
+            {"item": str(item_id), "body": body},
+        )
+        return data["create_update"]["id"]
+
 
 def build_main_column_values(analysis: RfpAnalysis) -> dict[str, Any]:
     values: dict[str, Any] = {
@@ -133,6 +144,44 @@ def build_subitem_column_values(
         config.SUB_COL_STATUS: {"label": config.DEFAULT_TASK_STATUS},
         config.SUB_COL_HOURS: str(task.estimated_hours),
         config.SUB_COL_DUE_DATE: {"date": task.due_date(deadline_date).isoformat()},
+    }
+    if executor:
+        values[config.SUB_COL_EXECUTOR] = {"labels": [executor]}
+    return values
+
+
+def build_fit_report_column_values(report: FitReport) -> dict[str, Any]:
+    """Main item column values from a deep FitReport."""
+    analysis_text = (
+        f"ציון התאמה: {report.fit_score}\n\n"
+        f"{report.recommendation_he}\n\n"
+        + (("סיבות להתאמה:\n" + "\n".join(f"• {r}" for r in report.fit_reasons) + "\n\n") if report.fit_reasons else "")
+        + (("פסילות:\n" + "\n".join(f"• {d}" for d in report.disqualifiers)) if report.disqualifiers else "")
+    ).strip()
+
+    values: dict[str, Any] = {
+        config.COL_REQUEST_TYPE: {"label": config.REQUEST_TYPE_VALUE},
+        config.COL_OUR_STAGE: {"label": config.INITIAL_OUR_STAGE},
+        config.COL_SOURCE: {"label": report.source_category},
+        config.COL_DEADLINE: {"date": report.deadline.isoformat()},
+        config.COL_SUBMISSION_ANALYSIS: {"text": analysis_text},
+    }
+    if report.requested_amount_usd is not None:
+        values[config.COL_BUDGET_REQUESTED] = str(report.requested_amount_usd)
+    return values
+
+
+def build_requirement_column_values(
+    req: Requirement,
+    deadline_date,
+    *,
+    executor: str | None = None,
+) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        config.SUB_COL_TASK_TYPE: {"labels": [req.action_type]},
+        config.SUB_COL_STATUS: {"label": config.DEFAULT_TASK_STATUS},
+        config.SUB_COL_HOURS: str(req.estimated_hours),
+        config.SUB_COL_DUE_DATE: {"date": req.due_date(deadline_date).isoformat()},
     }
     if executor:
         values[config.SUB_COL_EXECUTOR] = {"labels": [executor]}

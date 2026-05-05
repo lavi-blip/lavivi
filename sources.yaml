@@ -1,0 +1,172 @@
+# פלטפורמות לסריקה שיגרתית של קולות קוראים
+# סוגים: rss | html
+# כל פלטפורמה מסומנת בקטגוריה לצורך בחירת קבוצת Monday
+# url_verify: true = ה-URL ידוע ומאומת; false = יש לבדוק ולעדכן
+
+platforms:
+
+  # ──────────────────────────────────────────────
+  # ממשל ורשויות ישראל
+  # ──────────────────────────────────────────────
+
+  - name: "רשות החדשנות — קולות קוראים"
+    category: "ממשל / רשויות"
+    type: html
+    url: "https://www.innovationisrael.org.il/he/calls"
+    item_selector: "article.call-item, .call-for-proposals-item, .tender-item"
+    title_selector: "h2, h3, .title"
+    link_selector: "a"
+    date_selector: ".date, .deadline"
+    url_verify: true
+
+  - name: "משרד הרווחה — מכרזים ומענקים"
+    category: "ממשל / רשויות"
+    type: html
+    url: "https://www.gov.il/he/departments/ministry_of_labor_social_affairs_and_social_services/govil-landing-page"
+    item_selector: ".tenders-list .item, .tender-row"
+    title_selector: "h3, .title"
+    link_selector: "a"
+    date_selector: ".date"
+    url_verify: false  # בדוק URL מדויק לדף המכרזים
+
+  - name: "משרד החינוך — קולות קוראים"
+    category: "ממשל / רשויות"
+    type: html
+    url: "https://edu.gov.il/owlHeb/Administration/AboutMinistry/calls-for-proposals/Pages/default.aspx"
+    item_selector: ".ms-listviewtable tr, .call-item"
+    title_selector: "td a, h3"
+    link_selector: "a"
+    date_selector: "td:nth-child(3)"
+    url_verify: false
+
+  - name: "משרד התרבות — קולות קוראים"
+    category: "ממשל / רשויות"
+    type: html
+    url: "https://www.gov.il/he/departments/ministry_of_culture_and_sport/govil-landing-page"
+    item_selector: ".tender-item"
+    title_selector: ".title, h3"
+    link_selector: "a"
+    date_selector: ".deadline"
+    url_verify: false
+
+  - name: "מפעל הפיס — מענקים לארגונים"
+    category: "ממשל / רשויות"
+    type: html
+    url: "https://www.pais.co.il/about/supportApplications.aspx"
+    item_selector: ".grant-item, .support-item"
+    title_selector: "h3, .title"
+    link_selector: "a"
+    date_selector: ".date"
+    url_verify: true
+
+  # ──────────────────────────────────────────────
+  # קרנות פילנתרופיות ישראליות
+  # ──────────────────────────────────────────────
+
+  - name: "יד הנדיב — קולות קוראים"
+    category: "קרנות פילנתרופיות"
+    type: html
+    url: "https://www.yadhanadiv.org.il/grants"
+    item_selector: ".grant-item, .call-item, article"
+    title_selector: "h2, h3, .title"
+    link_selector: "a"
+    date_selector: ".date, .deadline"
+    url_verify: true
+
+  - name: "קרן רש\"י — קולות קוראים"
+    category: "קרנות פילנתרופיות"
+    type: html
+    url: "https://www.rashi-foundation.org.il/calls-for-proposals"
+    item_selector: ".call-item, article, .grant"
+    title_selector: "h2, h3"
+    link_selector: "a"
+    date_selector: ".date"
+    url_verify: true
+
+  - name: "קרן תל אביב — מענקים"
+    category: "קרנות פילנתרופיות"
+    type: html
+    url: "https://www.tel-aviv-foundation.org.il/he/grants"
+    item_selector: ".grant-row, .call-item"
+    title_selector: "h3, .title"
+    link_selector: "a"
+    date_selector: ".deadline"
+    url_verify: false
+
+  - name: "קרן רוטשילד — קולות קוראים"
+    category: "קרנות פילנתרופיות"
+    type: html
+    url: "https://www.rothschildfoundation.org.il/he/calls"
+    item_selector: ".call-item, article"
+    title_selector: "h2, h3"
+    link_selector: "a"
+    date_selector: ".date"
+    url_verify: false
+
+  # ──────────────────────────────────────────────
+  # מגזר שלישי — אגרגטורים ישראלים
+  # ──────────────────────────────────────────────
+
+  - name: "מגזר-ג — קולות קוראים"
+    category: "מגזר שלישי"
+    type: html
+    url: "https://www.mgazer3.org.il/calls"
+    item_selector: ".post, article, .item"
+    title_selector: "h2, h3, .entry-title"
+    link_selector: "a"
+    date_selector: ".date, .post-date"
+    url_verify: false  # בדוק URL
+
+  - name: "NGO-IL — לוח מכרזים"
+    category: "מגזר שלישי"
+    type: html
+    url: "https://www.ngo-il.org.il/grants"
+    item_selector: "article, .grant-item"
+    title_selector: "h2, h3"
+    link_selector: "a"
+    date_selector: ".date"
+    url_verify: false
+
+  # ──────────────────────────────────────────────
+  # מקורות בינלאומיים
+  # ──────────────────────────────────────────────
+
+  - name: "EU Funding & Tenders Portal — Israel"
+    category: "מקורות בינלאומיים"
+    type: html
+    url: "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals?programmePeriod=2021-2027"
+    item_selector: ".call-item, .opportunity-item"
+    title_selector: "h2, .title"
+    link_selector: "a"
+    date_selector: ".deadline"
+    url_verify: true
+
+  - name: "שגרירות ארה\"ב ישראל — מענקים"
+    category: "מקורות בינלאומיים"
+    type: html
+    url: "https://il.usembassy.gov/education-culture/exchange-programs/grants/"
+    item_selector: "article, .grant-item, li"
+    title_selector: "h2, h3, a"
+    link_selector: "a"
+    date_selector: ".date"
+    url_verify: true
+
+  - name: "JDC Israel — מענקים לעמותות"
+    category: "מקורות בינלאומיים"
+    type: html
+    url: "https://www.jdc.org.il/he/grants"
+    item_selector: ".grant-item, article"
+    title_selector: "h2, h3"
+    link_selector: "a"
+    date_selector: ".date"
+    url_verify: false
+
+  - name: "New Israel Fund — קולות קוראים"
+    category: "מקורות בינלאומיים"
+    type: html
+    url: "https://www.nif.org.il/grants"
+    item_selector: "article, .grant"
+    title_selector: "h2, h3"
+    link_selector: "a"
+    date_selector: ".date"
+    url_verify: false

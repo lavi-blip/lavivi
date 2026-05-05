@@ -64,10 +64,10 @@ def test_analyze_rfp_happy_path():
     assert all(t.estimated_hours > 0 for t in result.tasks)
 
 
-def test_analyze_rfp_blocks_when_deadline_missing():
+def test_analyze_rfp_returns_none_deadline_when_missing():
     client = FakeAnthropic(_payload(deadline=None))
-    with pytest.raises(ValueError, match="deadline"):
-        analyze_rfp("some content", client=client)
+    result = analyze_rfp("some content", client=client)
+    assert result.deadline is None
 
 
 def test_analyze_rfp_rejects_zero_hours():

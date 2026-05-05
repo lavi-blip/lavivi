@@ -1,14 +1,12 @@
-"""Claude-powered extraction of structured RFP data."""
+"""RFP extraction using any supported LLM provider (Claude or Gemini)."""
 
 from __future__ import annotations
 
 import json
-import os
 from datetime import date
 
-from anthropic import Anthropic
-
-from .config import CLAUDE_MODEL, SOURCE_CATEGORIES, TASK_TYPES
+from .config import SOURCE_CATEGORIES, TASK_TYPES
+from .llm import LLMClient, Provider, from_env
 from .models import RfpAnalysis, Task
 
 
@@ -64,22 +62,37 @@ def _user_prompt(content: str) -> str:
 ---"""
 
 
-def analyze_rfp(content: str, *, client: Anthropic | None = None) -> RfpAnalysis:
+def analyze_rfp(
+    content: str,
+    *,
+    llm: LLMClient | None = None,
+    provider: Provider = "claude",
+    # legacy: accept bare Anthropic client for backward-compat with tests
+    client=None,
+) -> RfpAnalysis:
     if not content.strip():
         raise ValueError("Cannot analyze empty content")
 
-    client = client or Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    if client is not None:
+        # test path: wrap legacy Anthropic mock
+        raw = _call_legacy_client(client, content)
+    else:
+        llm = llm or from_env()
+        raw = llm.complete(system=SYSTEM_PROMPT, user=_user_prompt(content), max_tokens=4096)
 
+    payload = _extract_json(raw)
+    return _to_analysis(payload)
+
+
+def _call_legacy_client(client, content: str) -> str:
+    from .config import CLAUDE_MODEL
     message = client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": _user_prompt(content)}],
     )
-
-    raw = "".join(block.text for block in message.content if block.type == "text")
-    payload = _extract_json(raw)
-    return _to_analysis(payload)
+    return "".join(block.text for block in message.content if block.type == "text")
 
 
 def _extract_json(text: str) -> dict:
@@ -94,12 +107,7 @@ def _extract_json(text: str) -> dict:
 
 def _to_analysis(payload: dict) -> RfpAnalysis:
     deadline_raw = payload.get("deadline")
-    if not deadline_raw:
-        raise ValueError(
-            "Claude could not extract a deadline from the RFP content. "
-            "Refusing to create a Monday item without one — please supply the "
-            "deadline manually or use a clearer source."
-        )
+    deadline = date.fromisoformat(deadline_raw) if deadline_raw else None
 
     source_category = payload.get("source_category", "")
     if source_category not in SOURCE_CATEGORIES:
@@ -119,7 +127,7 @@ def _to_analysis(payload: dict) -> RfpAnalysis:
     return RfpAnalysis(
         title_he=payload["title_he"].strip(),
         funder=payload.get("funder", "").strip(),
-        deadline=date.fromisoformat(deadline_raw),
+        deadline=deadline,
         origin=payload["origin"],
         source_category=source_category,
         submission_analysis_he=payload["submission_analysis_he"].strip(),

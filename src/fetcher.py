@@ -10,17 +10,31 @@ from bs4 import BeautifulSoup
 
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (compatible; LaviviRfpIntake/1.0; "
-        "+https://github.com/lavi-blip/lavivi)"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "he,en;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
 }
 
 MAX_CHARS = 60_000
 
 
 def fetch_url(url: str, timeout: int = 30) -> str:
-    response = requests.get(url, headers=HEADERS, timeout=timeout)
+    session = requests.Session()
+    session.headers.update(HEADERS)
+    response = session.get(url, timeout=timeout, allow_redirects=True)
+
+    if response.status_code in (403, 401, 429):
+        return _fetch_with_browser(url, timeout=timeout)
+
     response.raise_for_status()
 
     content_type = response.headers.get("Content-Type", "").lower()
@@ -28,6 +42,38 @@ def fetch_url(url: str, timeout: int = 30) -> str:
         return _extract_pdf_bytes(response.content)
 
     return _extract_html(response.text)
+
+
+def _fetch_with_browser(url: str, timeout: int = 30) -> str:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        raise ValueError(
+            "נדרשת התקנה חד-פעמית: הרץ בPowerShell:\n"
+            "python -m playwright install chromium"
+        )
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent=HEADERS["User-Agent"],
+            locale="he-IL",
+            viewport={"width": 1280, "height": 800},
+        )
+        page = context.new_page()
+        page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+        page.wait_for_timeout(4000)
+        # try to wait for meaningful content
+        try:
+            page.wait_for_selector("main, article, .content, #content, [role='main']",
+                                   timeout=10_000)
+        except Exception:
+            pass
+        text = page.inner_text("body")
+        browser.close()
+
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    return "\n".join(lines)[:MAX_CHARS]
 
 
 def read_file(path: str | Path) -> str:
