@@ -37,37 +37,18 @@ with st.sidebar:
     st.caption("כלי ניהול קולות קוראים")
     st.divider()
 
-    st.subheader("🤖 ספק AI")
-    provider = st.radio(
-        "בחר ספק",
-        options=["claude", "gemini"],
-        format_func=lambda x: "Claude (Anthropic)" if x == "claude" else "Gemini (Google AI Studio)",
-        index=0,
-        label_visibility="collapsed",
-    )
+    provider = "gemini"
 
-    st.subheader("🔑 מפתחות API")
-    if provider == "claude":
-        anthropic_key = st.text_input(
-            "Anthropic API Key",
-            value=os.environ.get("ANTHROPIC_API_KEY", ""),
-            type="password",
-            placeholder="sk-ant-...",
-        )
-        if anthropic_key:
-            os.environ["ANTHROPIC_API_KEY"] = anthropic_key
-        gemini_key = None
-    else:
-        gemini_key = st.text_input(
-            "Gemini API Key",
-            value=os.environ.get("GEMINI_API_KEY", ""),
-            type="password",
-            placeholder="AIza...",
-            help="השג מפתח ב-aistudio.google.com/app/apikey",
-        )
-        if gemini_key:
-            os.environ["GEMINI_API_KEY"] = gemini_key
-        anthropic_key = None
+    st.subheader("🔑 מפתח API")
+    gemini_key = st.text_input(
+        "Gemini API Key",
+        value=os.environ.get("GEMINI_API_KEY", ""),
+        type="password",
+        placeholder="AIza...",
+        help="השג מפתח ב-aistudio.google.com/app/apikey",
+    )
+    if gemini_key:
+        os.environ["GEMINI_API_KEY"] = gemini_key
 
     monday_key = st.text_input(
         "Monday.com API Key",
@@ -83,9 +64,9 @@ with st.sidebar:
     st.divider()
     with st.expander("💡 Google AI Studio"):
         st.markdown("""
-עצב פרומפטים ב-[aistudio.google.com](https://aistudio.google.com) ← בחר **Gemini** כספק כאן.
+עצב פרומפטים ב-[aistudio.google.com](https://aistudio.google.com).
 
-הכלי ישתמש אוטומטית במפתח ה-Gemini שלך.
+הכלי משתמש במפתח ה-Gemini שהכנסת למעלה.
         """)
 
 
@@ -95,10 +76,8 @@ def _get_llm():
 
 
 def _check_keys() -> bool:
-    if provider == "claude" and not os.environ.get("ANTHROPIC_API_KEY"):
-        st.error("הכנס Anthropic API Key בסרגל הצד.")
-        return False
-    if provider == "gemini" and not os.environ.get("GEMINI_API_KEY"):
+    if not os.environ.get("GEMINI_API_KEY"):
+        st.error("הכנס Gemini API Key בסרגל הצד.")
         st.error("הכנס Gemini API Key בסרגל הצד.")
         return False
     return True
@@ -126,7 +105,7 @@ with tab_specific:
                                 help="זוחל דפים נוספים + בודק התאמה מול פרופיל הארגון")
 
     uploaded = st.file_uploader("או העלה קובץ PDF", type=["pdf", "txt", "html"])
-    create_in_monday = st.checkbox("צור ב-Monday לאחר הניתוח", value=True)
+    create_in_monday = st.checkbox("צור ב-Monday לאחר הניתוח", value=False)
 
     analyze_btn = st.button("🔍 נתח", type="primary", use_container_width=True)
 
