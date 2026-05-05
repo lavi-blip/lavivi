@@ -80,7 +80,7 @@ class LLMClient:
 def _default_model(provider: Provider) -> str:
     return {
         "claude": "claude-opus-4-7",
-        "gemini": "gemini-2.0-flash",
+        "gemini": "gemini-2.5-flash",
     }[provider]
 
 
