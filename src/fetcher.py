@@ -61,7 +61,8 @@ def _fetch_with_browser(url: str, timeout: int = 30) -> str:
             viewport={"width": 1280, "height": 800},
         )
         page = context.new_page()
-        page.goto(url, wait_until="networkidle", timeout=timeout * 1000)
+        page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+        page.wait_for_timeout(2000)  # let JS render initial content
         html = page.content()
         browser.close()
 
